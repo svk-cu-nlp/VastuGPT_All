@@ -4,3 +4,13 @@ python-dotenv==1.0.1
 openai==1.12.0
 python-multipart==0.0.9
 slowapi==0.1.9
+langchain 
+langchain_community 
+duckduckgo-search 
+langchain_cohere
+beautifulsoup4
+requests
+google-generativeai 
+langchain-google-genai 
+langserve
+langchain_groq

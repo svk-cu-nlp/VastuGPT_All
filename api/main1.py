@@ -1,19 +1,18 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional
-from langchain_groq import ChatGroq
 from datetime import datetime
-# from langchain.chat_models import ChatGroq
-from langchain.schema import AIMessage, HumanMessage, SystemMessage
 import os
+import cohere
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Initialize LangChain Groq model
-groq_model = ChatGroq(api_key=os.getenv("GROQ_API_KEY"), model="llama-3.2-90b-text-preview")
+# Initialize Cohere client
+client = cohere.Client(api_key=os.getenv("COHERE_API_KEY"))
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -39,27 +38,28 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 async def chat(request: Request, chat_request: ChatRequest):
     try:
-        # Convert messages to LangChain format
-        langchain_messages = []
-        for msg in chat_request.messages:
-            if msg.role == "system":
-                langchain_messages.append(SystemMessage(content=msg.content))
-            elif msg.role == "user":
-                langchain_messages.append(HumanMessage(content=msg.content))
-            elif msg.role == "assistant":
-                langchain_messages.append(AIMessage(content=msg.content))
+        # Combine messages into a single prompt for Cohere
+        prompt = "\n".join([f"{msg.role}: {msg.content}" for msg in chat_request.messages])
+        prompt += "\nassistant:"
 
-        # Generate a response using the Groq model
-        response = groq_model(messages=langchain_messages)
+        # Cohere response
+        response = client.generate(
+            model="command-r-plus-08-2024",
+            prompt=prompt,
+            max_tokens=3000,
+            temperature=0.7
+        )
 
         return {
             "role": "assistant",
-            "content": response.content,
+            "content": response.generations[0].text.strip(),
             "timestamp": datetime.now().isoformat()
         }
 
+    except cohere.CohereError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/api/health")
 async def health_check():
