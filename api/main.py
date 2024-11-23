@@ -8,6 +8,11 @@ from datetime import datetime
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
 import os
 from dotenv import load_dotenv
+from langchain_text_splitters import MarkdownHeaderTextSplitter
+import pymupdf4llm
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # Load environment variables
 load_dotenv()
@@ -36,6 +41,44 @@ class ChatRequest(BaseModel):
     messages: List[Message]
     stream: Optional[bool] = False
 
+def readFile():
+    print('Reading File')
+    md_text = pymupdf4llm.to_markdown("AdvanceVastuAndRemedies.pdf")
+    with open("output.md", "w", encoding="utf-8") as file:
+        file.write(md_text)
+    print("Markdown text written to output.md")
+    headers_to_split_on = [
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+    ]
+    markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on)
+    md_header_splits = markdown_splitter.split_text(md_text)
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    chunk_size = 2000
+    chunk_overlap = 200
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    )
+
+    # Split
+    splits = text_splitter.split_documents(md_header_splits)
+    print(splits)
+    return splits
+
+def createVectorDB(chunks):
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    db = FAISS.from_documents(chunks, embeddings)
+    query = "Is it good to have bathroom in north east side of my building?"
+    results = db.similarity_search(query)
+    for res in results:
+        print(res.page_content)
+        with open("search.txt", "a", encoding="utf-8") as file:
+            file.write(res.page_content)
+
+splits = readFile()
+createVectorDB(splits)
 @app.post("/api/chat")
 async def chat(request: Request, chat_request: ChatRequest):
     try:
