@@ -8,11 +8,12 @@ pnpm-debug.log*
 lerna-debug.log*
 
 /api/vastu_env/
+/api/.env
 node_modules
 dist
 dist-ssr
 *.local
-.env
+*.env
 
 # Editor directories and files
 .vscode/*
